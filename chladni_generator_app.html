@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CHLADNI // BRUTAL AUDIO // WEBGL</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    background: #000;
+    overflow: hidden;
+    font-family: monospace;
+    color: #fff;
+  }
+
+  canvas {
+    display: block;
+    width: 100vw;
+    height: 100vh;
+  }
+
+  .ui {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    width: min(320px, calc(100vw - 40px));
+    background: rgba(0, 0, 0, 0.78);
+    border: 1px solid #262626;
+    padding: 14px;
+    font-size: 12px;
+    line-height: 1.4;
+    z-index: 20;
+    backdrop-filter: blur(8px);
+  }
+
+  .title {
+    font-size: 13px;
+    font-weight: bold;
+    letter-spacing: 0.08em;
+    margin-bottom: 10px;
+  }
+
+  .row {
+    margin-top: 10px;
+  }
+
+  .label {
+    display: block;
+    margin-bottom: 6px;
+    color: #a8a8a8;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 11px;
+  }
+
+  .preset-grid,
+  .button-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+
+  .button-grid.two {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  button,
+  select,
+  input[type="range"] {
+    width: 100%;
+  }
+
+  button,
+  select {
+    background: #fff;
+    color: #000;
+    border: none;
+    padding: 10px 8px;
+    cursor: pointer;
+    font-weight: bold;
+    font-family: monospace;
+  }
+
+  button.secondary {
+    background: #121212;
+    color: #fff;
+    border: 1px solid #2f2f2f;
+  }
+
+  button.active {
+    background: #7cff00;
+    color: #000;
+  }
+
+  input[type="range"] {
+    accent-color: #fff;
+    cursor: pointer;
+  }
+
+  .statline {
+    margin-top: 12px;
+    color: #bdbdbd;
+    font-size: 11px;
+    word-break: break-word;
+  }
+
+  .footer {
+    position: fixed;
+    right: 18px;
+    bottom: 16px;
+    font-size: 11px;
+    color: rgba(255,255,255,0.5);
+    background: rgba(0,0,0,0.35);
+    border: 1px solid rgba(255,255,255,0.08);
+    padding: 8px 10px;
+    z-index: 15;
+    letter-spacing: 0.06em;
+  }
+
+  @media (max-width: 640px) {
+    .ui {
+      top: 10px;
+      left: 10px;
+      width: calc(100vw - 20px);
+      padding: 12px;
+    }
+  }
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+
+<div class="ui">
+  <div class="title">CHLADNI // WEBGL // AUDIO REACTIVE</div>
+
+  <div class="row">
+    <span class="label">Presets</span>
+    <div class="preset-grid">
+      <button class="preset active" data-preset="techno">TECHNO</button>
+      <button class="preset secondary" data-preset="ambient">AMBIENT</button>
+      <button class="preset secondary" data-preset="noise">NOISE</button>
+    </div>
+  </div>
+
+  <div class="row">
+    <span class="label">Palette</span>
+    <select id="palette">
+      <option value="0">BRUTAL RGB</option>
+      <option value="1">ICE</option>
+      <option value="2">PHOSPHOR</option>
+      <option value="3">VOID HEAT</option>
+    </select>
+  </div>
+
+  <div class="row">
+    <span class="label">Complexity</span>
+    <input id="complexity" type="range" min="1.0" max="12.0" step="0.01" value="5.4" />
+  </div>
+
+  <div class="row">
+    <span class="label">Distortion</span>
+    <input id="distortion" type="range" min="0.0" max="3.0" step="0.01" value="1.25" />
+  </div>
+
+  <div class="row">
+    <span class="label">Threshold</span>
+    <input id="threshold" type="range" min="0.001" max="0.25" step="0.001" value="0.045" />
+  </div>
+
+  <div class="row">
+    <span class="label">Animation Speed</span>
+    <input id="speed" type="range" min="0.0" max="4.0" step="0.01" value="1.35" />
+  </div>
+
+  <div class="row button-grid two">
+    <button id="micBtn">ENABLE MIC</button>
+    <button id="pauseBtn" class="secondary">PAUSE</button>
+  </div>
+
+  <div class="statline" id="stats">audio: off // preset: techno // renderer: webgl</div>
+</div>
+
+<div class="footer">FAST PATTERNS FOR CIVILIZED CHAOS</div>
+
+<script>
+const canvas = document.getElementById('gl');
+const gl = canvas.getContext('webgl', { antialias: false, preserveDrawingBuffer: false });
+
+if (!gl) {
+  document.body.innerHTML = '<div style="padding:24px;color:white;background:black;font-family:monospace;">WebGL is not available in this browser.</div>';
+  throw new Error('WebGL not supported');
+}
+
+const vertexShaderSource = `
+attribute vec2 a_position;
+varying vec2 v_uv;
+void main() {
+  v_uv = a_position * 0.5 + 0.5;
+  gl_Position = vec4(a_position, 0.0, 1.0);
+}
+`;
+
+const fragmentShaderSource = `
+precision highp float;
+
+varying vec2 v_uv;
+
+uniform vec2 u_resolution;
+uniform float u_time;
+uniform float u_energy;
+uniform float u_centroid;
+uniform float u_complexity;
+uniform float u_distortion;
+uniform float u_threshold;
+uniform float u_speed;
+uniform float u_palette;
+uniform float u_preset;
+
+mat2 rot(float a) {
+  float s = sin(a);
+  float c = cos(a);
+  return mat2(c, -s, s, c);
+}
+
+float chladni(vec2 p, float m, float n, float t) {
+  float a = sin(m * 3.14159265 * p.x + t) * sin(n * 3.14159265 * p.y);
+  float b = sin(n * 3.14159265 * p.x) * sin(m * 3.14159265 * p.y - t * 1.13);
+  float c = cos((m + n) * 1.5707963 * p.x + t * 0.31) * cos((m - n) * 1.5707963 * p.y - t * 0.21);
+  return (a - b) * 0.72 + c * 0.28;
+}
+
+vec3 palette(float v, float glow, float paletteId) {
+  v = clamp(v, 0.0, 1.0);
+  glow = clamp(glow, 0.0, 1.0);
+
+  if (paletteId < 0.5) {
+    return vec3(v, v * (0.35 + glow * 0.95), 1.0 - v * 0.82);
+  } else if (paletteId < 1.5) {
+    return vec3(0.08 + v * 0.45, 0.35 + glow * 0.65, 0.55 + v * 0.45);
+  } else if (paletteId < 2.5) {
+    return vec3(0.12 + glow * 0.35, 0.95 * v, 0.25 + glow * 0.2);
+  }
+  return vec3(0.28 + glow * 0.72, 0.06 + v * 0.18, 0.02 + (1.0 - v) * 0.12);
+}
+
+void main() {
+  vec2 uv = v_uv;
+  vec2 p = uv * 2.0 - 1.0;
+  p.x *= u_resolution.x / u_resolution.y;
+
+  float energy = clamp(u_energy, 0.0, 1.0);
+  float centroid = clamp(u_centroid, 0.0, 1.0);
+  float t = u_time * u_speed;
+
+  float presetWarp = mix(0.75, 1.65, u_preset / 2.0);
+  float complexity = u_complexity + energy * (2.2 + u_preset * 0.8);
+  float distortion = u_distortion * (0.5 + presetWarp) + centroid * 1.6;
+
+  vec2 q = p;
+  q *= rot(t * 0.07 + centroid * 2.4);
+
+  float field = 0.0;
+  float amp = 0.62;
+  float sumAmp = 0.0;
+
+  for (int i = 0; i < 4; i++) {
+    float fi = float(i);
+    vec2 pp = q;
+    pp += vec2(
+      sin(pp.y * (2.0 + fi * 0.7) + t * (0.6 + fi * 0.17)),
+      cos(pp.x * (2.4 + fi * 0.9) - t * (0.52 + fi * 0.13))
+    ) * distortion * 0.08;
+
+    pp *= rot(t * 0.03 * (fi + 1.0) + energy * 0.6);
+
+    float m = complexity + fi * (1.1 + centroid * 2.2);
+    float n = complexity * (1.15 + fi * 0.13) + 2.0 + energy * 8.0;
+
+    field += chladni(pp, m, n, t * (0.8 + fi * 0.15)) * amp;
+    sumAmp += amp;
+    amp *= 0.63;
+  }
+
+  field /= max(sumAmp, 0.001);
+
+  float ridges = abs(field);
+  float threshold = u_threshold + energy * 0.08 + u_preset * 0.015;
+  float lines = 1.0 - smoothstep(threshold, threshold + 0.08 + u_preset * 0.015, ridges);
+  float glow = 1.0 - smoothstep(0.0, 1.15 + u_preset * 0.3, ridges * (1.8 + centroid));
+
+  float grain = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453123);
+  lines += (grain - 0.5) * 0.035 * (0.5 + u_preset * 0.7);
+
+  vec3 col = palette(lines, glow, u_palette);
+  col *= 0.65 + glow * 0.55;
+  col += lines * 0.18;
+
+  if (u_preset > 1.5) {
+    col.rg += vec2(grain * 0.15, (1.0 - grain) * 0.08) * energy;
+  }
+
+  gl_FragColor = vec4(col, 1.0);
+}
+`;
+
+function createShader(type, source) {
+  const shader = gl.createShader(type);
+  gl.shaderSource(shader, source);
+  gl.compileShader(shader);
+  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+    const error = gl.getShaderInfoLog(shader);
+    gl.deleteShader(shader);
+    throw new Error(error);
+  }
+  return shader;
+}
+
+function createProgram(vertexSrc, fragmentSrc) {
+  const program = gl.createProgram();
+  const vs = createShader(gl.VERTEX_SHADER, vertexSrc);
+  const fs = createShader(gl.FRAGMENT_SHADER, fragmentSrc);
+  gl.attachShader(program, vs);
+  gl.attachShader(program, fs);
+  gl.linkProgram(program);
+  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+    const error = gl.getProgramInfoLog(program);
+    gl.deleteProgram(program);
+    throw new Error(error);
+  }
+  return program;
+}
+
+const program = createProgram(vertexShaderSource, fragmentShaderSource);
+gl.useProgram(program);
+
+const positionBuffer = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+gl.bufferData(
+  gl.ARRAY_BUFFER,
+  new Float32Array([
+    -1, -1,
+     1, -1,
+    -1,  1,
+    -1,  1,
+     1, -1,
+     1,  1
+  ]),
+  gl.STATIC_DRAW
+);
+
+const aPosition = gl.getAttribLocation(program, 'a_position');
+gl.enableVertexAttribArray(aPosition);
+gl.vertexAttribPointer(aPosition, 2, gl.FLOAT, false, 0, 0);
+
+const uniforms = {
+  resolution: gl.getUniformLocation(program, 'u_resolution'),
+  time: gl.getUniformLocation(program, 'u_time'),
+  energy: gl.getUniformLocation(program, 'u_energy'),
+  centroid: gl.getUniformLocation(program, 'u_centroid'),
+  complexity: gl.getUniformLocation(program, 'u_complexity'),
+  distortion: gl.getUniformLocation(program, 'u_distortion'),
+  threshold: gl.getUniformLocation(program, 'u_threshold'),
+  speed: gl.getUniformLocation(program, 'u_speed'),
+  palette: gl.getUniformLocation(program, 'u_palette'),
+  preset: gl.getUniformLocation(program, 'u_preset')
+};
+
+const paletteEl = document.getElementById('palette');
+const complexityEl = document.getElementById('complexity');
+const distortionEl = document.getElementById('distortion');
+const thresholdEl = document.getElementById('threshold');
+const speedEl = document.getElementById('speed');
+const micBtn = document.getElementById('micBtn');
+const pauseBtn = document.getElementById('pauseBtn');
+const statsEl = document.getElementById('stats');
+const presetButtons = [...document.querySelectorAll('.preset')];
+
+const presets = {
+  techno: {
+    complexity: 5.4,
+    distortion: 1.25,
+    threshold: 0.045,
+    speed: 1.35,
+    palette: 0,
+    presetIndex: 0
+  },
+  ambient: {
+    complexity: 3.1,
+    distortion: 0.55,
+    threshold: 0.09,
+    speed: 0.42,
+    palette: 1,
+    presetIndex: 1
+  },
+  noise: {
+    complexity: 8.8,
+    distortion: 2.25,
+    threshold: 0.022,
+    speed: 2.45,
+    palette: 3,
+    presetIndex: 2
+  }
+};
+
+let currentPreset = 'techno';
+let paused = false;
+let startTime = performance.now();
+let pausedTime = 0;
+
+let audioContext = null;
+let analyser = null;
+let audioData = null;
+let audioEnabled = false;
+let smoothEnergy = 0;
+let smoothCentroid = 0;
+
+function resize() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const width = Math.floor(window.innerWidth * dpr);
+  const height = Math.floor(window.innerHeight * dpr);
+  canvas.width = width;
+  canvas.height = height;
+  gl.viewport(0, 0, width, height);
+}
+
+window.addEventListener('resize', resize);
+resize();
+
+function setPreset(name) {
+  const preset = presets[name];
+  currentPreset = name;
+  complexityEl.value = preset.complexity;
+  distortionEl.value = preset.distortion;
+  thresholdEl.value = preset.threshold;
+  speedEl.value = preset.speed;
+  paletteEl.value = String(preset.palette);
+
+  presetButtons.forEach((btn) => {
+    const active = btn.dataset.preset === name;
+    btn.classList.toggle('active', active);
+    btn.classList.toggle('secondary', !active);
+  });
+}
+
+presetButtons.forEach((btn) => {
+  btn.addEventListener('click', () => setPreset(btn.dataset.preset));
+});
+
+setPreset('techno');
+
+async function enableMic() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: true
+      }
+    });
+
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const source = audioContext.createMediaStreamSource(stream);
+    analyser = audioContext.createAnalyser();
+    analyser.fftSize = 1024;
+    analyser.smoothingTimeConstant = 0.86;
+    source.connect(analyser);
+    audioData = new Uint8Array(analyser.frequencyBinCount);
+    audioEnabled = true;
+    micBtn.textContent = 'MIC ACTIVE';
+    micBtn.disabled = true;
+  } catch (err) {
+    statsEl.textContent = `audio: failed (${err.message}) // preset: ${currentPreset} // renderer: webgl`;
+  }
+}
+
+micBtn.addEventListener('click', enableMic);
+
+pauseBtn.addEventListener('click', () => {
+  paused = !paused;
+  pauseBtn.textContent = paused ? 'RESUME' : 'PAUSE';
+  if (paused) {
+    pausedTime = performance.now();
+  } else {
+    startTime += performance.now() - pausedTime;
+  }
+});
+
+function getAudioFeatures() {
+  if (!audioEnabled || !analyser || !audioData) {
+    smoothEnergy *= 0.92;
+    smoothCentroid *= 0.9;
+    return { energy: smoothEnergy, centroid: smoothCentroid };
+  }
+
+  analyser.getByteFrequencyData(audioData);
+  let sum = 0;
+  let weighted = 0;
+  let total = 0;
+
+  for (let i = 0; i < audioData.length; i++) {
+    const v = audioData[i] / 255;
+    sum += v;
+    weighted += i * v;
+    total += v;
+  }
+
+  const energy = sum / audioData.length;
+  const centroid = total > 0 ? (weighted / total) / audioData.length : 0;
+
+  smoothEnergy = smoothEnergy * 0.84 + energy * 0.16;
+  smoothCentroid = smoothCentroid * 0.88 + centroid * 0.12;
+
+  return { energy: smoothEnergy, centroid: smoothCentroid };
+}
+
+function render() {
+  const now = performance.now();
+  const time = paused ? (pausedTime - startTime) * 0.001 : (now - startTime) * 0.001;
+  const audio = getAudioFeatures();
+  const presetIndex = presets[currentPreset].presetIndex;
+
+  gl.useProgram(program);
+  gl.uniform2f(uniforms.resolution, canvas.width, canvas.height);
+  gl.uniform1f(uniforms.time, time);
+  gl.uniform1f(uniforms.energy, audio.energy);
+  gl.uniform1f(uniforms.centroid, audio.centroid);
+  gl.uniform1f(uniforms.complexity, parseFloat(complexityEl.value));
+  gl.uniform1f(uniforms.distortion, parseFloat(distortionEl.value));
+  gl.uniform1f(uniforms.threshold, parseFloat(thresholdEl.value));
+  gl.uniform1f(uniforms.speed, parseFloat(speedEl.value));
+  gl.uniform1f(uniforms.palette, parseFloat(paletteEl.value));
+  gl.uniform1f(uniforms.preset, presetIndex);
+
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+  statsEl.textContent = `audio: ${audioEnabled ? audio.energy.toFixed(3) : 'off'} // centroid: ${audio.centroid.toFixed(3)} // preset: ${currentPreset} // renderer: webgl`;
+
+  requestAnimationFrame(render);
+}
+
+render();
+</script>
+</body>
+</html>
