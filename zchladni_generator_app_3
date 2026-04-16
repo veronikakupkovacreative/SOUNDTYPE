@@ -1,0 +1,1003 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Chladni Particle Text</title>
+<style>
+:root{
+  --bg:#050505;
+  --panel:rgba(16,16,18,0.9);
+  --panel-border:rgba(255,255,255,0.08);
+  --text:#f3f3f3;
+  --muted:#a7acb8;
+  --shadow:0 20px 60px rgba(0,0,0,0.4);
+  --radius:18px;
+  --green:#7cff00;
+  --blue:#1980ff;
+  --track:#efefef;
+}
+*{box-sizing:border-box}
+html,body{
+  margin:0;
+  width:100%;
+  height:100%;
+  background:var(--bg);
+  color:var(--text);
+  font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  overflow:hidden;
+}
+canvas{
+  display:block;
+  width:100vw;
+  height:100vh;
+  background:#000;
+}
+.panel-wrap{
+  position:fixed;
+  left:24px;
+  right:24px;
+  bottom:24px;
+  display:grid;
+  grid-template-columns:minmax(360px,1.55fr) minmax(280px,0.9fr) minmax(280px,0.9fr);
+  gap:18px;
+  z-index:20;
+}
+.card{
+  background:var(--panel);
+  border:1px solid var(--panel-border);
+  border-radius:34px;
+  box-shadow:var(--shadow);
+  backdrop-filter:blur(18px);
+  padding:26px;
+  min-height:450px;
+}
+.title{
+  margin:0 0 22px;
+  font-size:28px;
+  line-height:1;
+  font-weight:700;
+  letter-spacing:0.02em;
+}
+.section-title{
+  margin:0 0 18px;
+  color:var(--muted);
+  font-size:12px;
+  letter-spacing:0.12em;
+  text-transform:uppercase;
+}
+.stack{display:grid;gap:14px}
+.controls-grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:20px 18px}
+.controls-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.preset-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.control{display:flex;flex-direction:column;gap:8px}
+.label-row{display:flex;justify-content:space-between;gap:8px}
+label,.control-label{
+  font-size:11px;
+  color:var(--muted);
+  letter-spacing:0.08em;
+  text-transform:uppercase;
+}
+.value{font-size:12px;color:var(--text)}
+input[type="text"],input[type="file"],select,button{
+  width:100%;
+  border:1px solid rgba(255,255,255,0.1);
+  background:rgba(255,255,255,0.04);
+  color:var(--text);
+  border-radius:24px;
+  padding:18px 20px;
+  font-size:18px;
+}
+input[type="text"]::placeholder{color:#d9d9d9}
+input[type="file"]{
+  font-size:14px;
+  color:var(--muted);
+  padding:15px 16px;
+  border-style:dashed;
+}
+button{
+  cursor:pointer;
+  transition:transform .15s ease,background .15s ease,border-color .15s ease,color .15s ease;
+}
+button:hover{transform:translateY(-1px)}
+button.primary{
+  background:rgba(255,255,255,.94);
+  color:#000;
+  border:none;
+  font-weight:700;
+}
+button.preset{border-radius:0;background:#0c0c0f;font-weight:700;font-size:20px;padding:20px 14px}
+button.preset.active{background:var(--green);color:#000;border-color:var(--green)}
+button.secondary{background:rgba(255,255,255,0.04)}
+button.compact{padding:16px 18px;font-size:16px}
+.pill-row{display:flex;flex-wrap:wrap;gap:12px;margin-top:14px}
+.pill{
+  border-radius:999px;
+  padding:12px 18px;
+  font-size:12px;
+  color:var(--muted);
+  background:rgba(255,255,255,0.05);
+  border:1px solid rgba(255,255,255,0.08);
+}
+.status{
+  margin-top:18px;
+  padding:18px 20px;
+  border-radius:20px;
+  background:rgba(255,255,255,0.04);
+  color:var(--muted);
+  font-size:12px;
+  line-height:1.5;
+  min-height:142px;
+}
+.range-wrap{display:flex;flex-direction:column;gap:10px}
+input[type="range"]{
+  -webkit-appearance:none;
+  appearance:none;
+  width:100%;
+  height:16px;
+  background:linear-gradient(to right,var(--blue) 0%,var(--blue) var(--fill,50%),var(--track) var(--fill,50%),var(--track) 100%);
+  border-radius:999px;
+  outline:none;
+}
+input[type="range"]::-webkit-slider-thumb{
+  -webkit-appearance:none;
+  appearance:none;
+  width:32px;
+  height:32px;
+  border-radius:50%;
+  background:var(--blue);
+  border:none;
+  box-shadow:none;
+}
+input[type="range"]::-moz-range-thumb{
+  width:32px;
+  height:32px;
+  border-radius:50%;
+  background:var(--blue);
+  border:none;
+}
+input[type="range"]::-moz-range-track{
+  height:16px;
+  border-radius:999px;
+  background:var(--track);
+}
+.hidden-font-input{display:none}
+.frame-preview{
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:5;
+}
+.frame-outline{
+  border:1px solid rgba(255,255,255,0.14);
+  box-shadow:0 0 0 9999px rgba(0,0,0,0.18) inset;
+}
+@media (max-width:1200px){
+  .panel-wrap{grid-template-columns:1fr;left:12px;right:12px;bottom:12px}
+  .card{min-height:auto}
+  .controls-grid-3{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<div class="frame-preview"><div class="frame-outline" id="frameOutline"></div></div>
+
+<div class="panel-wrap">
+  <div class="card">
+    <h1 class="title" id="titlePreview">COURT</h1>
+    <div class="stack">
+      <div class="control">
+        <div class="control-label">Enter text</div>
+        <input id="textInput" type="text" value="COURT" maxlength="22" placeholder="COURT" />
+      </div>
+
+      <div class="controls-grid-3">
+        <div class="control">
+          <div class="label-row"><label for="size">Size</label><span class="value" id="sizeValue">330</span></div>
+          <div class="range-wrap"><input id="size" type="range" min="180" max="520" step="1" value="330" /></div>
+        </div>
+        <div class="control">
+          <div class="label-row"><label for="track">Track</label><span class="value" id="trackValue">-20</span></div>
+          <div class="range-wrap"><input id="track" type="range" min="-50" max="80" step="1" value="-20" /></div>
+        </div>
+        <div class="control">
+          <div class="label-row"><label for="lead">Lead</label><span class="value" id="leadValue">3.0</span></div>
+          <div class="range-wrap"><input id="lead" type="range" min="0.8" max="6.0" step="0.1" value="3.0" /></div>
+        </div>
+      </div>
+
+      <div class="control">
+        <div class="control-label">Presets</div>
+        <div class="preset-grid">
+          <button class="preset active" data-preset="techno">Techno</button>
+          <button class="preset" data-preset="ambient">Ambient</button>
+          <button class="preset" data-preset="noise">Noise</button>
+        </div>
+      </div>
+
+      <div class="stack">
+        <div class="control">
+          <div class="label-row"><label for="complexity">Complexity</label><span class="value" id="complexityValue">5.4</span></div>
+          <div class="range-wrap"><input id="complexity" type="range" min="1" max="12" step="0.1" value="5.4" /></div>
+        </div>
+        <div class="control">
+          <div class="label-row"><label for="distortion">Distortion</label><span class="value" id="distortionValue">1.25</span></div>
+          <div class="range-wrap"><input id="distortion" type="range" min="0" max="3" step="0.01" value="1.25" /></div>
+        </div>
+        <div class="control">
+          <div class="label-row"><label for="threshold">Threshold</label><span class="value" id="thresholdValue">0.045</span></div>
+          <div class="range-wrap"><input id="threshold" type="range" min="0.005" max="0.25" step="0.001" value="0.045" /></div>
+        </div>
+        <div class="control">
+          <div class="label-row"><label for="speed">Speed</label><span class="value" id="speedValue">1.35</span></div>
+          <div class="range-wrap"><input id="speed" type="range" min="0" max="4" step="0.01" value="1.35" /></div>
+        </div>
+      </div>
+
+      <div class="controls-grid-2">
+        <div class="control">
+          <label for="paletteSelect">Palette</label>
+          <select id="paletteSelect">
+            <option value="techno">Preset palette</option>
+            <option value="ice">Ice</option>
+            <option value="phosphor">Phosphor</option>
+            <option value="heat">Void Heat</option>
+            <option value="custom">Custom colors</option>
+          </select>
+        </div>
+        <div class="control">
+          <label for="aspectRatio">Aspect Ratio</label>
+          <select id="aspectRatio">
+            <option value="1:1">1:1</option>
+            <option value="4:5">4:5</option>
+            <option value="3:4">3:4</option>
+            <option value="2:3">2:3</option>
+            <option value="16:9" selected>16:9</option>
+            <option value="9:16">9:16</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="controls-grid-2">
+        <div class="control">
+          <label for="textColor">Text color</label>
+          <input id="textColor" type="color" value="#f6efdd" />
+        </div>
+        <div class="control">
+          <label for="bgColor">Background</label>
+          <input id="bgColor" type="color" value="#000000" />
+        </div>
+      </div>
+
+      <div class="controls-grid-2">
+        <div class="control">
+          <label for="brushRadius">Brush Radius</label>
+          <div class="label-row"><span></span><span class="value" id="brushRadiusValue">120</span></div>
+          <div class="range-wrap"><input id="brushRadius" type="range" min="20" max="300" step="1" value="120" /></div>
+        </div>
+        <div class="control">
+          <label for="pushForce">Push Force</label>
+          <div class="label-row"><span></span><span class="value" id="pushForceValue">6.0</span></div>
+          <div class="range-wrap"><input id="pushForce" type="range" min="0.5" max="20" step="0.1" value="6.0" /></div>
+        </div>
+      </div>
+
+      <div class="controls-grid-2">
+        <button id="fontUploadBtn" class="compact secondary">Upload Font</button>
+        <input id="fontFile" class="hidden-font-input" type="file" accept=".ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,font/woff2" />
+        <button id="generateBtn" class="compact primary">Generate</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <p class="section-title">Sound</p>
+    <div class="stack">
+      <button id="micBtn" class="primary">Mic</button>
+      <input id="fileInput" type="file" accept="audio/*" />
+      <div class="controls-grid-3">
+        <button id="playBtn" class="compact">Play file</button>
+        <button id="pauseBtn" class="compact secondary">Pause</button>
+        <button id="stopBtn" class="compact secondary">Stop</button>
+      </div>
+    </div>
+    <div class="pill-row">
+      <div class="pill" id="audioState">Audio: off</div>
+      <div class="pill" id="energyState">Energy: 0.000</div>
+      <div class="pill" id="centroidState">Centroid: 0.000</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <p class="section-title">Export</p>
+    <div class="controls-grid-2">
+      <button id="exportBtn" class="compact">PNG</button>
+      <button id="exportHtmlBtn" class="compact secondary">WEBGL</button>
+    </div>
+    <div class="stack" style="margin-top:14px">
+      <button id="recordBtn" class="compact secondary">Record</button>
+      <button id="pauseVisualBtn" class="compact secondary">Pause</button>
+    </div>
+    <div class="pill-row">
+      <div class="pill" id="recordState">Recorder: idle</div>
+      <div class="pill" id="renderState">Render: static</div>
+    </div>
+    <div class="status" id="status">
+      Připraveno. Text zůstává statický, dokud nestiskneš Generate. Teprve potom se rozběhne animace a hudba začne proměňovat text do patternu a zpět.
+    </div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const frameOutline = document.getElementById('frameOutline');
+
+const titlePreview = document.getElementById('titlePreview');
+const textInput = document.getElementById('textInput');
+const generateBtn = document.getElementById('generateBtn');
+const micBtn = document.getElementById('micBtn');
+const fileInput = document.getElementById('fileInput');
+const playBtn = document.getElementById('playBtn');
+const pauseBtn = document.getElementById('pauseBtn');
+const stopBtn = document.getElementById('stopBtn');
+const pauseVisualBtn = document.getElementById('pauseVisualBtn');
+const exportBtn = document.getElementById('exportBtn');
+const exportHtmlBtn = document.getElementById('exportHtmlBtn');
+const recordBtn = document.getElementById('recordBtn');
+const fontUploadBtn = document.getElementById('fontUploadBtn');
+const fontFile = document.getElementById('fontFile');
+const statusEl = document.getElementById('status');
+const audioStateEl = document.getElementById('audioState');
+const energyStateEl = document.getElementById('energyState');
+const centroidStateEl = document.getElementById('centroidState');
+const recordStateEl = document.getElementById('recordState');
+const renderStateEl = document.getElementById('renderState');
+
+const sizeEl = document.getElementById('size');
+const trackEl = document.getElementById('track');
+const leadEl = document.getElementById('lead');
+const complexityEl = document.getElementById('complexity');
+const distortionEl = document.getElementById('distortion');
+const thresholdEl = document.getElementById('threshold');
+const speedEl = document.getElementById('speed');
+const paletteSelect = document.getElementById('paletteSelect');
+const aspectRatioEl = document.getElementById('aspectRatio');
+const textColorEl = document.getElementById('textColor');
+const bgColorEl = document.getElementById('bgColor');
+const brushRadiusEl = document.getElementById('brushRadius');
+const pushForceEl = document.getElementById('pushForce');
+
+const sizeValue = document.getElementById('sizeValue');
+const trackValue = document.getElementById('trackValue');
+const leadValue = document.getElementById('leadValue');
+const complexityValue = document.getElementById('complexityValue');
+const distortionValue = document.getElementById('distortionValue');
+const thresholdValue = document.getElementById('thresholdValue');
+const speedValue = document.getElementById('speedValue');
+const brushRadiusValue = document.getElementById('brushRadiusValue');
+const pushForceValue = document.getElementById('pushForceValue');
+const presetButtons = [...document.querySelectorAll('.preset')];
+
+const presets = {
+  techno: { complexity: 5.4, distortion: 1.25, threshold: 0.045, speed: 1.35, colors: ['#f6efdd','#000000'] },
+  ambient: { complexity: 3.1, distortion: 0.55, threshold: 0.090, speed: 0.42, colors: ['#bce6ff','#020613'] },
+  noise: { complexity: 8.8, distortion: 2.25, threshold: 0.022, speed: 2.45, colors: ['#ffd299','#040000'] }
+};
+
+const paletteDefs = {
+  techno: { text: '#f6efdd', bg: '#000000' },
+  ice: { text: '#bce6ff', bg: '#03111c' },
+  phosphor: { text: '#a7ff66', bg: '#020803' },
+  heat: { text: '#ffb394', bg: '#140302' }
+};
+
+const mouse = { x: 0, y: 0, active: false };
+let width = 0;
+let height = 0;
+let currentPreset = 'techno';
+let currentFontFamily = 'Inter, Arial, sans-serif';
+let particles = [];
+let visualPaused = false;
+let animationStarted = false;
+let phase = 'text';
+let phaseBlend = 0;
+let cycleClock = 0;
+let cycleDirection = 1;
+let lastTime = performance.now();
+let elapsed = 0;
+let recorder = null;
+let recordChunks = [];
+
+const AudioEngine = (() => {
+  let ctxAudio = null;
+  let analyser = null;
+  let data = null;
+  let stream = null;
+  let source = null;
+  let buffer = null;
+  let startTime = 0;
+  let offset = 0;
+  let playing = false;
+  let mode = 'off';
+  let smoothEnergy = 0;
+  let smoothCentroid = 0;
+
+  function init() {
+    if (!ctxAudio) ctxAudio = new (window.AudioContext || window.webkitAudioContext)();
+    if (!analyser) {
+      analyser = ctxAudio.createAnalyser();
+      analyser.fftSize = 1024;
+      analyser.smoothingTimeConstant = 0.86;
+      data = new Uint8Array(analyser.frequencyBinCount);
+    }
+  }
+
+  function disconnectSource() {
+    if (source) {
+      try { if (typeof source.stop === 'function') source.stop(0); } catch {}
+      try { source.disconnect(); } catch {}
+      source = null;
+    }
+  }
+
+  function stopTracks() {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      stream = null;
+    }
+  }
+
+  function cleanupAll() {
+    disconnectSource();
+    stopTracks();
+    playing = false;
+    offset = 0;
+    mode = 'off';
+  }
+
+  async function initMic() {
+    init();
+    cleanupAll();
+    await ctxAudio.resume();
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: true
+      }
+    });
+    source = ctxAudio.createMediaStreamSource(stream);
+    source.connect(analyser);
+    mode = 'mic';
+  }
+
+  async function loadFile(file) {
+    if (!file) return;
+    init();
+    disconnectSource();
+    stopTracks();
+    playing = false;
+    offset = 0;
+    await ctxAudio.resume();
+    const arr = await file.arrayBuffer();
+    buffer = await ctxAudio.decodeAudioData(arr.slice(0));
+    mode = 'file';
+  }
+
+  async function play() {
+    if (mode !== 'file' || !buffer) return;
+    if (playing) return;
+    await ctxAudio.resume();
+    disconnectSource();
+    source = ctxAudio.createBufferSource();
+    source.buffer = buffer;
+    source.loop = true;
+    source.connect(analyser);
+    startTime = ctxAudio.currentTime - offset;
+    source.start(0, offset % buffer.duration);
+    playing = true;
+    source.onended = () => {
+      if (source && !source.loop) playing = false;
+    };
+  }
+
+  function pause() {
+    if (mode !== 'file' || !playing) return;
+    offset = ctxAudio.currentTime - startTime;
+    disconnectSource();
+    playing = false;
+  }
+
+  function stop() {
+    if (mode === 'mic') {
+      cleanupAll();
+      return;
+    }
+    if (mode === 'file') {
+      disconnectSource();
+      playing = false;
+      offset = 0;
+    }
+  }
+
+  function getFeatures() {
+    if (!analyser || !data || mode === 'off') {
+      smoothEnergy *= 0.92;
+      smoothCentroid *= 0.92;
+      return { energy: smoothEnergy, centroid: smoothCentroid };
+    }
+    analyser.getByteFrequencyData(data);
+    let sum = 0, weighted = 0, total = 0;
+    for (let i = 0; i < data.length; i++) {
+      const v = data[i] / 255;
+      sum += v;
+      weighted += i * v;
+      total += v;
+    }
+    const energy = sum / data.length;
+    const centroid = total ? (weighted / total) / data.length : 0;
+    smoothEnergy = smoothEnergy * 0.84 + energy * 0.16;
+    smoothCentroid = smoothCentroid * 0.88 + centroid * 0.12;
+    return { energy: smoothEnergy, centroid: smoothCentroid };
+  }
+
+  return {
+    initMic,
+    loadFile,
+    play,
+    pause,
+    stop,
+    getFeatures,
+    get mode() { return mode; },
+    get playing() { return playing; }
+  };
+})();
+
+function clamp(v, min, max) {
+  return Math.min(max, Math.max(min, v));
+}
+
+function updateRangeFill(input) {
+  const min = Number(input.min ?? 0);
+  const max = Number(input.max ?? 100);
+  const val = Number(input.value);
+  const pct = ((val - min) / (max - min)) * 100;
+  input.style.setProperty('--fill', `${pct}%`);
+}
+
+function updateLabels() {
+  sizeValue.textContent = sizeEl.value;
+  trackValue.textContent = trackEl.value;
+  leadValue.textContent = Number(leadEl.value).toFixed(1);
+  complexityValue.textContent = Number(complexityEl.value).toFixed(1);
+  distortionValue.textContent = Number(distortionEl.value).toFixed(2);
+  thresholdValue.textContent = Number(thresholdEl.value).toFixed(3);
+  speedValue.textContent = Number(speedEl.value).toFixed(2);
+  brushRadiusValue.textContent = brushRadiusEl.value;
+  pushForceValue.textContent = Number(pushForceEl.value).toFixed(1);
+  [sizeEl, trackEl, leadEl, complexityEl, distortionEl, thresholdEl, speedEl, brushRadiusEl, pushForceEl].forEach(updateRangeFill);
+}
+
+function setStatus(message) {
+  statusEl.textContent = message;
+}
+
+function parseAspectRatio(value) {
+  const [w, h] = value.split(':').map(Number);
+  return { w, h };
+}
+
+function resize() {
+  width = canvas.width = window.innerWidth;
+  height = canvas.height = window.innerHeight;
+  updateFrameOutline();
+  if (!animationStarted) generateStaticText();
+}
+
+function updateFrameOutline() {
+  const { w, h } = parseAspectRatio(aspectRatioEl.value);
+  const maxW = window.innerWidth * 0.92;
+  const maxH = window.innerHeight * 0.92;
+  let outlineW = maxW;
+  let outlineH = outlineW * (h / w);
+  if (outlineH > maxH) {
+    outlineH = maxH;
+    outlineW = outlineH * (w / h);
+  }
+  frameOutline.style.width = `${outlineW}px`;
+  frameOutline.style.height = `${outlineH}px`;
+}
+
+function getFrameRect() {
+  const rect = frameOutline.getBoundingClientRect();
+  return { x: rect.left, y: rect.top, w: rect.width, h: rect.height };
+}
+
+function currentPalette() {
+  if (paletteSelect.value === 'custom') {
+    return { text: textColorEl.value, bg: bgColorEl.value };
+  }
+  if (paletteSelect.value === 'techno') {
+    const p = presets[currentPreset].colors;
+    return { text: p[0], bg: p[1] };
+  }
+  return paletteDefs[paletteSelect.value];
+}
+
+function hexToRgb(hex) {
+  const normalized = hex.replace('#', '');
+  const bigint = parseInt(normalized, 16);
+  return {
+    r: (bigint >> 16) & 255,
+    g: (bigint >> 8) & 255,
+    b: bigint & 255
+  };
+}
+
+function blendColor(hexA, hexB, t) {
+  const a = hexToRgb(hexA);
+  const b = hexToRgb(hexB);
+  const r = Math.round(a.r + (b.r - a.r) * t);
+  const g = Math.round(a.g + (b.g - a.g) * t);
+  const b2 = Math.round(a.b + (b.b - a.b) * t);
+  return `rgb(${r},${g},${b2})`;
+}
+
+function buildTextMask(text) {
+  const off = document.createElement('canvas');
+  const octx = off.getContext('2d');
+  off.width = 1600;
+  off.height = 700;
+  const frame = getFrameRect();
+  const fontSize = Number(sizeEl.value);
+  const track = Number(trackEl.value);
+  const lead = Number(leadEl.value);
+  octx.clearRect(0, 0, off.width, off.height);
+  octx.fillStyle = '#fff';
+  octx.textAlign = 'center';
+  octx.textBaseline = 'middle';
+  octx.font = `700 ${fontSize}px ${currentFontFamily}`;
+
+  const chars = (text || 'COURT').split('');
+  let total = 0;
+  const advances = [];
+  chars.forEach(char => {
+    const widthChar = octx.measureText(char).width + track;
+    advances.push({ char, width: widthChar });
+    total += widthChar;
+  });
+  total -= track;
+
+  let cursor = off.width / 2 - total / 2;
+  const baselineY = off.height / 2;
+  chars.forEach(({ char }, i) => {
+    octx.fillText(char, cursor + advances[i].width / 2, baselineY);
+    cursor += advances[i].width;
+  });
+
+  const img = octx.getImageData(0, 0, off.width, off.height).data;
+  const out = [];
+  const step = 4;
+  for (let y = 0; y < off.height; y += step) {
+    for (let x = 0; x < off.width; x += step) {
+      const idx = (x + y * off.width) * 4;
+      if (img[idx] > 110) {
+        out.push({
+          x: frame.x + Math.random() * frame.w,
+          y: frame.y + Math.random() * frame.h,
+          tx: frame.x + x / off.width * frame.w,
+          ty: frame.y + y / off.height * frame.h,
+          ox: 0,
+          oy: 0
+        });
+      }
+    }
+  }
+  return out;
+}
+
+function generateStaticText() {
+  const text = (textInput.value || 'COURT').trim() || 'COURT';
+  titlePreview.textContent = text;
+  particles = buildTextMask(text);
+  phaseBlend = 0;
+  phase = 'text';
+  cycleClock = 0;
+  cycleDirection = 1;
+  elapsed = 0;
+}
+
+function generateAndStart() {
+  generateStaticText();
+  animationStarted = true;
+  renderStateEl.textContent = 'Render: live';
+  setStatus('Animace spuštěna. Text se podle hudby přelévá do patternu a zpět.');
+}
+
+function chladniValue(nx, ny, t, energy, centroid) {
+  const complexity = parseFloat(complexityEl.value);
+  const distortion = parseFloat(distortionEl.value);
+  const speed = parseFloat(speedEl.value);
+  let qx = nx;
+  let qy = ny;
+  const tt = t * speed;
+  qx += Math.sin(qy * 2.8 + tt * 0.8) * (distortion * 0.08 + energy * 0.12);
+  qy += Math.cos(qx * 3.1 - tt * 0.7) * (distortion * 0.08 + energy * 0.12);
+  let amp = 0.62;
+  let sumAmp = 0;
+  let field = 0;
+  for (let i = 0; i < 4; i++) {
+    const scale = 1 + i * 0.08;
+    const px = qx * scale;
+    const py = qy * scale;
+    const m = complexity + i * (1 + centroid * 1.8) + energy * 5.0;
+    const n = complexity * (1.18 + i * 0.11) + 2.0 + energy * 8.0;
+    const a = Math.sin(m * Math.PI * px + tt * (0.9 + i * 0.14)) * Math.sin(n * Math.PI * py);
+    const b = Math.sin(n * Math.PI * px) * Math.sin(m * Math.PI * py - tt * 1.11);
+    const c = Math.cos((m + n) * Math.PI * 0.5 * px + tt * 0.35) * Math.cos((m - n) * Math.PI * 0.5 * py - tt * 0.25);
+    field += ((a - b) * 0.72 + c * 0.28) * amp;
+    sumAmp += amp;
+    amp *= 0.63;
+  }
+  return field / Math.max(sumAmp, 0.001);
+}
+
+function applyMouseInteraction(particle, dx, dy) {
+  if (!mouse.active) return { x: dx, y: dy };
+  const radius = Number(brushRadiusEl.value);
+  const force = Number(pushForceEl.value);
+  const px = particle.x;
+  const py = particle.y;
+  const mx = mouse.x;
+  const my = mouse.y;
+  const dist = Math.hypot(px - mx, py - my);
+  if (dist > radius || dist === 0) return { x: dx, y: dy };
+  const falloff = 1 - dist / radius;
+  const pushX = ((px - mx) / dist) * force * falloff * 2.4;
+  const pushY = ((py - my) / dist) * force * falloff * 2.4;
+  return { x: dx + pushX, y: dy + pushY };
+}
+
+function supportedRecordingType() {
+  const types = ['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
+  return types.find(type => window.MediaRecorder && MediaRecorder.isTypeSupported(type)) || '';
+}
+
+function toggleRecording() {
+  if (!window.MediaRecorder) {
+    setStatus('MediaRecorder není v tomhle browseru dostupný.');
+    return;
+  }
+  if (recorder && recorder.state === 'recording') {
+    recorder.stop();
+    return;
+  }
+  const mimeType = supportedRecordingType();
+  if (!mimeType) {
+    setStatus('Browser nepodporuje použitelný video export.');
+    return;
+  }
+  const stream = canvas.captureStream(60);
+  recordChunks = [];
+  recorder = new MediaRecorder(stream, { mimeType });
+  recorder.ondataavailable = event => {
+    if (event.data && event.data.size > 0) recordChunks.push(event.data);
+  };
+  recorder.onstop = () => {
+    const blob = new Blob(recordChunks, { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `chladni-recording-${Date.now()}.webm`;
+    link.click();
+    URL.revokeObjectURL(url);
+    recordStateEl.textContent = 'Recorder: idle';
+    recordBtn.textContent = 'Record';
+  };
+  recorder.start(200);
+  recordStateEl.textContent = 'Recorder: recording';
+  recordBtn.textContent = 'Stop recording';
+}
+
+function exportHTML() {
+  const blob = new Blob([document.documentElement.outerHTML], { type: 'text/html;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'chladni-generator.html';
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function render(now) {
+  requestAnimationFrame(render);
+  const dt = Math.min(0.033, (now - lastTime) / 1000);
+  lastTime = now;
+  if (!visualPaused && animationStarted) elapsed += dt;
+
+  const { energy, centroid } = AudioEngine.getFeatures();
+  audioStateEl.textContent = `Audio: ${AudioEngine.mode}`;
+  energyStateEl.textContent = `Energy: ${energy.toFixed(3)}`;
+  centroidStateEl.textContent = `Centroid: ${centroid.toFixed(3)}`;
+
+  const palette = currentPalette();
+  ctx.fillStyle = palette.bg;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  if (animationStarted && !visualPaused) {
+    cycleClock += dt * (0.55 + energy * 1.8 + Number(speedEl.value) * 0.08);
+    if (cycleClock >= 1) {
+      cycleClock = 0;
+      cycleDirection *= -1;
+    }
+    const target = cycleDirection > 0 ? clamp(energy * 1.25 + 0.2, 0, 1) : 0;
+    phaseBlend += (target - phaseBlend) * (0.04 + energy * 0.04);
+  } else {
+    phaseBlend += (0 - phaseBlend) * 0.08;
+  }
+
+  phase = phaseBlend < 0.45 ? 'text' : 'pattern';
+  renderStateEl.textContent = animationStarted ? (visualPaused ? 'Render: paused' : 'Render: live') : 'Render: static';
+
+  const threshold = parseFloat(thresholdEl.value);
+  for (const p of particles) {
+    const nx = ((p.tx - width * 0.5) / width) * 2;
+    const ny = ((p.ty - height * 0.5) / height) * 2;
+    const field = chladniValue(nx, ny, elapsed, energy, centroid);
+    const ridges = Math.abs(field);
+    const lines = clamp(1 - ((ridges - threshold) / 0.09), 0, 1);
+    const glow = clamp(1 - ridges / 1.4, 0, 1);
+
+    const patternX = p.tx + Math.sin(field * 8 + elapsed * 2) * (16 + energy * 58) + (Math.random() - 0.5) * Number(distortionEl.value) * 5.4;
+    const patternY = p.ty + Math.cos(field * 8 - elapsed * 2) * (16 + energy * 58) + (Math.random() - 0.5) * Number(distortionEl.value) * 5.4;
+
+    const mixX = p.tx * (1 - phaseBlend) + patternX * phaseBlend;
+    const mixY = p.ty * (1 - phaseBlend) + patternY * phaseBlend;
+    const pushed = applyMouseInteraction(p, mixX, mixY);
+
+    p.x += (pushed.x - p.x) * (0.06 + energy * 0.08);
+    p.y += (pushed.y - p.y) * (0.06 + energy * 0.08);
+
+    const c = blendColor(palette.text, '#ffffff', glow * 0.18);
+    ctx.fillStyle = c;
+    const size = 1.1 + lines * 1.9 + energy * 1.25;
+    ctx.fillRect(p.x, p.y, size, size);
+  }
+}
+
+function runTests() {
+  console.assert(typeof AudioEngine.play === 'function', 'AudioEngine.play should exist');
+  console.assert(typeof AudioEngine.pause === 'function', 'AudioEngine.pause should exist');
+  console.assert(typeof chladniValue(0.1, 0.1, 1, 0.2, 0.3) === 'number', 'chladniValue should return number');
+  const sample = buildTextMask('A');
+  console.assert(Array.isArray(sample) && sample.length > 0, 'buildTextMask should generate particles');
+  applyPreset('ambient');
+  console.assert(Number(speedEl.value) === presets.ambient.speed, 'Preset should set speed');
+}
+
+function applyPreset(name) {
+  currentPreset = name;
+  const p = presets[name];
+  complexityEl.value = p.complexity;
+  distortionEl.value = p.distortion;
+  thresholdEl.value = p.threshold;
+  speedEl.value = p.speed;
+  if (paletteSelect.value === 'techno') {
+    textColorEl.value = p.colors[0];
+    bgColorEl.value = p.colors[1];
+  }
+  presetButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.preset === name));
+  updateLabels();
+}
+
+presetButtons.forEach(btn => btn.addEventListener('click', () => applyPreset(btn.dataset.preset)));
+
+[textInput, sizeEl, trackEl, leadEl].forEach(el => {
+  el.addEventListener('input', () => {
+    titlePreview.textContent = (textInput.value || 'COURT').trim() || 'COURT';
+    if (!animationStarted) generateStaticText();
+  });
+});
+
+[complexityEl, distortionEl, thresholdEl, speedEl, brushRadiusEl, pushForceEl].forEach(el => {
+  el.addEventListener('input', updateLabels);
+});
+
+paletteSelect.addEventListener('change', () => {
+  const disabled = paletteSelect.value !== 'custom';
+  textColorEl.disabled = disabled;
+  bgColorEl.disabled = disabled;
+});
+
+aspectRatioEl.addEventListener('change', () => {
+  updateFrameOutline();
+  generateStaticText();
+});
+
+fontUploadBtn.addEventListener('click', () => fontFile.click());
+fontFile.addEventListener('change', async (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+  const family = `UploadedFont-${Date.now()}`;
+  const url = URL.createObjectURL(file);
+  const face = new FontFace(family, `url(${url})`);
+  try {
+    await face.load();
+    document.fonts.add(face);
+    currentFontFamily = `"${family}", Inter, Arial, sans-serif`;
+    fontUploadBtn.textContent = 'Font loaded';
+    generateStaticText();
+  } catch (err) {
+    setStatus(`Font se nepodařilo načíst: ${err.message}`);
+  }
+});
+
+generateBtn.addEventListener('click', generateAndStart);
+micBtn.addEventListener('click', async () => {
+  try {
+    await AudioEngine.initMic();
+    setStatus('Mikrofon je aktivní. Po kliknutí na Generate se animace rozběhne.');
+  } catch (err) {
+    setStatus(`Audio error: ${err.message}`);
+  }
+});
+fileInput.addEventListener('change', async e => {
+  try {
+    await AudioEngine.loadFile(e.target.files[0]);
+    setStatus('Audio soubor načten. Klikni Play file a pak Generate.');
+  } catch (err) {
+    setStatus(`File error: ${err.message}`);
+  }
+});
+playBtn.addEventListener('click', async () => {
+  await AudioEngine.play();
+});
+pauseBtn.addEventListener('click', () => AudioEngine.pause());
+stopBtn.addEventListener('click', () => AudioEngine.stop());
+pauseVisualBtn.addEventListener('click', () => {
+  visualPaused = !visualPaused;
+  pauseVisualBtn.textContent = visualPaused ? 'Resume' : 'Pause';
+});
+exportBtn.addEventListener('click', () => {
+  const link = document.createElement('a');
+  link.download = 'frame.png';
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+});
+exportHtmlBtn.addEventListener('click', exportHTML);
+recordBtn.addEventListener('click', toggleRecording);
+
+canvas.addEventListener('mousemove', (event) => {
+  mouse.x = event.clientX;
+  mouse.y = event.clientY;
+  mouse.active = true;
+});
+canvas.addEventListener('mouseleave', () => {
+  mouse.active = false;
+});
+canvas.addEventListener('touchmove', (event) => {
+  const touch = event.touches[0];
+  if (!touch) return;
+  mouse.x = touch.clientX;
+  mouse.y = touch.clientY;
+  mouse.active = true;
+}, { passive: true });
+canvas.addEventListener('touchend', () => { mouse.active = false; });
+
+window.addEventListener('resize', resize);
+
+paletteSelect.dispatchEvent(new Event('change'));
+applyPreset('techno');
+updateLabels();
+resize();
+generateStaticText();
+runTests();
+requestAnimationFrame(render);
+</script>
+</body>
+</html>
