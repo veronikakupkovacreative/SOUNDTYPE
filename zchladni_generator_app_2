@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chladni Generator</title>
+  <style>
+    :root {
+      --bg: #050505;
+      --panel: rgba(16, 16, 18, 0.9);
+      --panel-border: rgba(255, 255, 255, 0.08);
+      --text: #f3f3f3;
+      --muted: #a7acb8;
+      --accent: #ffffff;
+      --shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+      --radius: 18px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      background: #000;
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      overflow: hidden;
+    }
+
+    canvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+      background: #000;
+    }
+
+    .panel {
+      position: fixed;
+      left: 24px;
+      bottom: 24px;
+      width: min(980px, calc(100vw - 48px));
+      display: grid;
+      grid-template-columns: minmax(280px, 1.5fr) minmax(170px, 0.9fr) minmax(170px, 0.9fr);
+      gap: 10px;
+      z-index: 20;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px);
+      padding: 14px;
+      min-height: 116px;
+    }
+
+    .title {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      margin: 0 0 12px;
+    }
+
+    .mini-title {
+      font-size: 12px;
+      color: var(--muted);
+      margin: 0 0 10px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .controls-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      align-items: end;
+    }
+
+    .row {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .row.full {
+      grid-column: 1 / -1;
+    }
+
+    .label-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    label {
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .value {
+      font-size: 12px;
+      color: var(--text);
+    }
+
+    input[type="range"],
+    input[type="text"],
+    input[type="file"],
+    select,
+    button {
+      width: 100%;
+    }
+
+    input[type="range"] {
+      accent-color: #fff;
+      cursor: pointer;
+      margin: 0;
+    }
+
+    input[type="text"],
+    select,
+    button {
+      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(255,255,255,0.04);
+      color: var(--text);
+      border-radius: 12px;
+      padding: 11px 12px;
+      font-size: 14px;
+    }
+
+    input[type="file"] {
+      border: 1px dashed rgba(255,255,255,0.15);
+      background: rgba(255,255,255,0.03);
+      color: var(--muted);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 13px;
+    }
+
+    button {
+      cursor: pointer;
+      transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      background: rgba(255,255,255,0.08);
+      border-color: rgba(255,255,255,0.18);
+    }
+
+    button.primary {
+      background: rgba(255,255,255,0.94);
+      color: #000;
+      border: none;
+      font-weight: 700;
+    }
+
+    button.active-record {
+      background: #ff3b30;
+      color: #fff;
+      border-color: rgba(255, 59, 48, 0.4);
+    }
+
+    .button-stack {
+      display: grid;
+      gap: 10px;
+    }
+
+    .button-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .pill {
+      border-radius: 999px;
+      padding: 7px 10px;
+      font-size: 11px;
+      color: var(--muted);
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .status {
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.04);
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+      min-height: 58px;
+    }
+
+    .top-tag {
+      position: fixed;
+      right: 22px;
+      top: 22px;
+      z-index: 15;
+      color: rgba(255,255,255,0.7);
+      font-size: 12px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      background: rgba(0,0,0,0.3);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 999px;
+      padding: 9px 12px;
+      backdrop-filter: blur(10px);
+    }
+
+    @media (max-width: 1080px) {
+      .panel {
+        grid-template-columns: 1fr;
+        width: calc(100vw - 24px);
+        left: 12px;
+        bottom: 12px;
+      }
+
+      .controls-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .top-tag {
+        right: 12px;
+        top: 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+
+  <div class="top-tag">WebGL Pattern Engine</div>
+
+  <div class="panel">
+    <div class="card">
+      <h1 class="title" id="patternTitle">COURT</h1>
+      <div class="controls-grid">
+        <div class="row full">
+          <label for="textInput">Enter text</label>
+          <input id="textInput" type="text" maxlength="22" value="COURT" placeholder="Zadej text" />
+        </div>
+
+        <div class="row">
+          <div class="label-row">
+            <label for="size">Size</label>
+            <span class="value" id="sizeValue">330</span>
+          </div>
+          <input id="size" type="range" min="180" max="520" step="1" value="330" />
+        </div>
+
+        <div class="row">
+          <div class="label-row">
+            <label for="track">Track</label>
+            <span class="value" id="trackValue">-20</span>
+          </div>
+          <input id="track" type="range" min="-50" max="80" step="1" value="-20" />
+        </div>
+
+        <div class="row">
+          <div class="label-row">
+            <label for="lead">Lead</label>
+            <span class="value" id="leadValue">3.0</span>
+          </div>
+          <input id="lead" type="range" min="0.8" max="6.0" step="0.1" value="3.0" />
+        </div>
+
+        <div class="row">
+          <div class="label-row">
+            <label for="complexity">Complexity</label>
+            <span class="value" id="complexityValue">5.4</span>
+          </div>
+          <input id="complexity" type="range" min="1.0" max="12.0" step="0.1" value="5.4" />
+        </div>
+
+        <div class="row">
+          <div class="label-row">
+            <label for="distortion">Distortion</label>
+            <span class="value" id="distortionValue">1.25</span>
+          </div>
+          <input id="distortion" type="range" min="0.0" max="3.0" step="0.01" value="1.25" />
+        </div>
+
+        <div class="row">
+          <div class="label-row">
+            <label for="threshold">Threshold</label>
+            <span class="value" id="thresholdValue">0.045</span>
+          </div>
+          <input id="threshold" type="range" min="0.005" max="0.25" step="0.001" value="0.045" />
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <p class="mini-title">Sound</p>
+      <div class="button-stack">
+        <button id="audioBtn" class="primary">Mic</button>
+        <input id="audioFile" type="file" accept=".mp3,.wav,audio/mpeg,audio/wav,audio/x-wav,audio/wave" />
+        <button id="playBtn">Play file</button>
+      </div>
+      <div class="pill-row">
+        <div class="pill" id="audioState">Audio: off</div>
+        <div class="pill" id="energyState">Energy: 0.000</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <p class="mini-title">Export</p>
+      <div class="button-grid">
+        <button id="exportPngBtn">PNG</button>
+        <button id="exportWebglBtn">WEBGL</button>
+      </div>
+      <div class="button-stack" style="margin-top:10px;">
+        <button id="recordBtn">Record</button>
+        <button id="pauseBtn">Pause</button>
+      </div>
+      <div class="pill-row">
+        <div class="pill" id="recordState">Recorder: idle</div>
+        <div class="pill" id="renderState">Render: live</div>
+      </div>
+      <div class="status" id="status">
+        Připraveno. Text nahoře určuje masku patternu. Mikrofon nebo nahraný audio soubor modulují body a intenzitu. RECORD uloží video ve formátu, který browser skutečně podporuje — obvykle WebM, ne magické unicorn mp4.
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const gl = canvas.getContext('webgl', { antialias: true, preserveDrawingBuffer: true, alpha: false });
+
+    if (!gl) {
+      document.body.innerHTML = '<div style="padding:24px;color:white;background:black;font-family:sans-serif;">WebGL není dostupný v tomto prohlížeči.</div>';
+      throw new Error('WebGL not supported');
+    }
+
+    const vertexShaderSource = `
+      attribute vec2 a_position;
+      varying vec2 v_uv;
+      void main() {
+        v_uv = a_position * 0.5 + 0.5;
+        gl_Position = vec4(a_position, 0.0, 1.0);
+      }
+    `;
+
+    const fragmentShaderSource = `
+      precision highp float;
+      varying vec2 v_uv;
+
+      uniform vec2 u_resolution;
+      uniform float u_time;
+      uniform float u_energy;
+      uniform float u_centroid;
+      uniform float u_complexity;
+      uniform float u_distortion;
+      uniform float u_threshold;
+      uniform vec4 u_textRect;
+      uniform vec2 u_textAspect;
+      uniform float u_edgeSoftness;
+      uniform float u_invert;
+
+      float hash(vec2 p) {
+        return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+      }
+
+      mat2 rot(float a) {
+        float s = sin(a);
+        float c = cos(a);
+        return mat2(c, -s, s, c);
+      }
+
+      float chladni(vec2 p, float m, float n, float t) {
+        float a = sin(m * 3.14159265 * p.x + t) * sin(n * 3.14159265 * p.y);
+        float b = sin(n * 3.14159265 * p.x) * sin(m * 3.14159265 * p.y - t * 1.11);
+        float c = cos((m + n) * 1.5707963 * p.x + t * 0.35) * cos((m - n) * 1.5707963 * p.y - t * 0.25);
+        return (a - b) * 0.72 + c * 0.28;
+      }
+
+      vec3 palette(float v, float glow) {
+        return vec3(
+          0.55 + glow * 0.45,
+          0.35 + v * 0.45,
+          0.90 - v * 0.25
+        );
+      }
+
+      void main() {
+        vec2 uv = v_uv;
+        vec2 p = uv * 2.0 - 1.0;
+        p.x *= u_resolution.x / u_resolution.y;
+
+        float t = u_time;
+        float energy = clamp(u_energy, 0.0, 1.0);
+        float centroid = clamp(u_centroid, 0.0, 1.0);
+
+        vec2 q = p;
+        q *= rot(t * 0.06 + centroid * 1.5);
+        q += vec2(
+          sin(q.y * 2.8 + t * 0.8),
+          cos(q.x * 3.1 - t * 0.7)
+        ) * (u_distortion * 0.08 + energy * 0.12);
+
+        float amp = 0.62;
+        float sumAmp = 0.0;
+        float field = 0.0;
+
+        for (int i = 0; i < 4; i++) {
+          float fi = float(i);
+          vec2 pp = q * (1.0 + fi * 0.08);
+          pp *= rot(t * 0.03 * (fi + 1.0));
+          float m = u_complexity + fi * (1.0 + centroid * 1.8) + energy * 5.0;
+          float n = u_complexity * (1.18 + fi * 0.11) + 2.0 + energy * 8.0;
+          field += chladni(pp, m, n, t * (0.9 + fi * 0.14)) * amp;
+          sumAmp += amp;
+          amp *= 0.63;
+        }
+
+        field /= max(sumAmp, 0.001);
+        float ridges = abs(field);
+        float lines = 1.0 - smoothstep(u_threshold, u_threshold + 0.09, ridges);
+        float glow = 1.0 - smoothstep(0.0, 1.4, ridges * (1.8 + centroid));
+
+        vec2 textUv = (uv - u_textRect.xy) / u_textRect.zw;
+        float inside = step(0.0, textUv.x) * step(0.0, textUv.y) * step(textUv.x, 1.0) * step(textUv.y, 1.0);
+        vec2 centered = (textUv - 0.5) * vec2(u_textAspect.x, u_textAspect.y);
+        float ellipse = length(centered * vec2(0.92, 1.0));
+        float maskShape = 1.0 - smoothstep(0.88, 0.88 + u_edgeSoftness, ellipse);
+        float mask = mix(inside * maskShape, 1.0 - inside * maskShape, u_invert);
+
+        float grain = hash(gl_FragCoord.xy + t * 60.0);
+        float dots = step(0.74 - energy * 0.22, grain + lines * 0.22 + glow * 0.18);
+        float alphaLike = dots * lines * mask;
+
+        vec3 col = palette(lines, glow);
+        col *= alphaLike;
+        col += vec3(0.01) * glow * mask;
+
+        gl_FragColor = vec4(col, 1.0);
+      }
+    `;
+
+    function createShader(type, source) {
+      const shader = gl.createShader(type);
+      gl.shaderSource(shader, source);
+      gl.compileShader(shader);
+      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        const error = gl.getShaderInfoLog(shader);
+        gl.deleteShader(shader);
+        throw new Error(error);
+      }
+      return shader;
+    }
+
+    function createProgram(vertexSrc, fragmentSrc) {
+      const program = gl.createProgram();
+      const vs = createShader(gl.VERTEX_SHADER, vertexSrc);
+      const fs = createShader(gl.FRAGMENT_SHADER, fragmentSrc);
+      gl.attachShader(program, vs);
+      gl.attachShader(program, fs);
+      gl.linkProgram(program);
+      if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+        const error = gl.getProgramInfoLog(program);
+        gl.deleteProgram(program);
+        throw new Error(error);
+      }
+      return program;
+    }
+
+    const program = createProgram(vertexShaderSource, fragmentShaderSource);
+    gl.useProgram(program);
+
+    const positionBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+    gl.bufferData(
+      gl.ARRAY_BUFFER,
+      new Float32Array([
+        -1, -1,
+         1, -1,
+        -1,  1,
+        -1,  1,
+         1, -1,
+         1,  1
+      ]),
+      gl.STATIC_DRAW
+    );
+
+    const aPosition = gl.getAttribLocation(program, 'a_position');
+    gl.enableVertexAttribArray(aPosition);
+    gl.vertexAttribPointer(aPosition, 2, gl.FLOAT, false, 0, 0);
+
+    const uniforms = {
+      resolution: gl.getUniformLocation(program, 'u_resolution'),
+      time: gl.getUniformLocation(program, 'u_time'),
+      energy: gl.getUniformLocation(program, 'u_energy'),
+      centroid: gl.getUniformLocation(program, 'u_centroid'),
+      complexity: gl.getUniformLocation(program, 'u_complexity'),
+      distortion: gl.getUniformLocation(program, 'u_distortion'),
+      threshold: gl.getUniformLocation(program, 'u_threshold'),
+      textRect: gl.getUniformLocation(program, 'u_textRect'),
+      textAspect: gl.getUniformLocation(program, 'u_textAspect'),
+      edgeSoftness: gl.getUniformLocation(program, 'u_edgeSoftness'),
+      invert: gl.getUniformLocation(program, 'u_invert')
+    };
+
+    const textInput = document.getElementById('textInput');
+    const patternTitle = document.getElementById('patternTitle');
+    const audioBtn = document.getElementById('audioBtn');
+    const audioFile = document.getElementById('audioFile');
+    const playBtn = document.getElementById('playBtn');
+    const exportPngBtn = document.getElementById('exportPngBtn');
+    const exportWebglBtn = document.getElementById('exportWebglBtn');
+    const recordBtn = document.getElementById('recordBtn');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const statusEl = document.getElementById('status');
+    const audioStateEl = document.getElementById('audioState');
+    const energyStateEl = document.getElementById('energyState');
+    const recordStateEl = document.getElementById('recordState');
+    const renderStateEl = document.getElementById('renderState');
+
+    const sizeEl = document.getElementById('size');
+    const trackEl = document.getElementById('track');
+    const leadEl = document.getElementById('lead');
+    const complexityEl = document.getElementById('complexity');
+    const distortionEl = document.getElementById('distortion');
+    const thresholdEl = document.getElementById('threshold');
+
+    const sizeValue = document.getElementById('sizeValue');
+    const trackValue = document.getElementById('trackValue');
+    const leadValue = document.getElementById('leadValue');
+    const complexityValue = document.getElementById('complexityValue');
+    const distortionValue = document.getElementById('distortionValue');
+    const thresholdValue = document.getElementById('thresholdValue');
+
+    let width = 0;
+    let height = 0;
+    let dpr = 1;
+    let paused = false;
+    let baseTime = performance.now();
+    let pauseStarted = 0;
+
+    let audioContext = null;
+    let analyser = null;
+    let audioData = null;
+    let audioSourceNode = null;
+    let currentAudioMode = 'off';
+    let currentFileUrl = null;
+    let fileAudioEl = null;
+    let smoothedEnergy = 0;
+    let smoothedCentroid = 0;
+
+    let recorder = null;
+    let recordChunks = [];
+    let recordingMimeType = '';
+
+    const textCanvas = document.createElement('canvas');
+    const textCtx = textCanvas.getContext('2d');
+    let textMetrics = {
+      x: 0.18,
+      y: 0.35,
+      w: 0.64,
+      h: 0.26,
+      aspectX: 1.0,
+      aspectY: 1.0,
+      softness: 0.18
+    };
+
+    function setStatus(message) {
+      statusEl.textContent = message;
+    }
+
+    function clamp(v, min, max) {
+      return Math.min(max, Math.max(min, v));
+    }
+
+    function lerp(a, b, t) {
+      return a + (b - a) * t;
+    }
+
+    function updateLabels() {
+      sizeValue.textContent = sizeEl.value;
+      trackValue.textContent = trackEl.value;
+      leadValue.textContent = Number(leadEl.value).toFixed(1);
+      complexityValue.textContent = Number(complexityEl.value).toFixed(1);
+      distortionValue.textContent = Number(distortionEl.value).toFixed(2);
+      thresholdValue.textContent = Number(thresholdEl.value).toFixed(3);
+    }
+
+    function resize() {
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      width = Math.floor(window.innerWidth * dpr);
+      height = Math.floor(window.innerHeight * dpr);
+      canvas.width = width;
+      canvas.height = height;
+      gl.viewport(0, 0, width, height);
+      rebuildTextMetrics();
+    }
+
+    function rebuildTextMetrics() {
+      const rawText = (textInput.value || 'COURT').trim();
+      const text = rawText.length ? rawText : 'COURT';
+      patternTitle.textContent = text;
+
+      const fontSize = Number(sizeEl.value);
+      const tracking = Number(trackEl.value);
+      const lead = Number(leadEl.value);
+      const normalizedLead = clamp(lead / 3.0, 0.4, 2.2);
+
+      textCanvas.width = Math.max(1024, Math.floor(width * 0.8));
+      textCanvas.height = 512;
+      textCtx.clearRect(0, 0, textCanvas.width, textCanvas.height);
+      textCtx.fillStyle = '#fff';
+      textCtx.textBaseline = 'top';
+      textCtx.font = `700 ${fontSize}px Inter, Arial, sans-serif`;
+
+      const chars = text.split('');
+      const advances = [];
+      let totalWidth = 0;
+      for (const char of chars) {
+        const metrics = textCtx.measureText(char);
+        const advance = metrics.width + tracking;
+        advances.push({ char, width: metrics.width, advance });
+        totalWidth += advance;
+      }
+      totalWidth = Math.max(1, totalWidth - tracking);
+
+      const textHeight = fontSize * normalizedLead;
+      const rectWpx = clamp(totalWidth + fontSize * 0.20, 120, textCanvas.width * 0.92);
+      const rectHpx = clamp(textHeight + fontSize * 0.36, 80, textCanvas.height * 0.85);
+
+      textMetrics.w = rectWpx / textCanvas.width;
+      textMetrics.h = rectHpx / textCanvas.height;
+      textMetrics.x = 0.5 - textMetrics.w * 0.5;
+      textMetrics.y = 0.5 - textMetrics.h * 0.5;
+      textMetrics.aspectX = rectWpx / Math.max(rectHpx, 1);
+      textMetrics.aspectY = 1.0;
+      textMetrics.softness = clamp(0.08 + Math.abs(tracking) / 240 + normalizedLead * 0.03, 0.06, 0.28);
+    }
+
+    function setupAudioAnalyser() {
+      if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (!analyser) {
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 1024;
+        analyser.smoothingTimeConstant = 0.86;
+        audioData = new Uint8Array(analyser.frequencyBinCount);
+      }
+    }
+
+    function disconnectCurrentAudioSource() {
+      try {
+        if (audioSourceNode) {
+          audioSourceNode.disconnect();
+        }
+      } catch (_) {}
+      audioSourceNode = null;
+    }
+
+    async function enableMicrophone() {
+      try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          throw new Error('Browser nepodporuje getUserMedia.');
+        }
+        setupAudioAnalyser();
+        await audioContext.resume();
+        disconnectCurrentAudioSource();
+
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: true
+          }
+        });
+
+        audioSourceNode = audioContext.createMediaStreamSource(stream);
+        audioSourceNode.connect(analyser);
+        currentAudioMode = 'mic';
+        audioStateEl.textContent = 'Audio: mic';
+        setStatus('Mikrofon je aktivní. Pattern teď žije z live vstupu.');
+      } catch (error) {
+        currentAudioMode = 'off';
+        audioStateEl.textContent = 'Audio: off';
+        setStatus(`Mikrofon se nepodařilo aktivovat: ${error.message}`);
+      }
+    }
+
+    async function loadAudioFile(file) {
+      if (!file) return;
+      try {
+        setupAudioAnalyser();
+        await audioContext.resume();
+        disconnectCurrentAudioSource();
+
+        if (fileAudioEl) {
+          fileAudioEl.pause();
+          fileAudioEl.src = '';
+        }
+        if (currentFileUrl) {
+          URL.revokeObjectURL(currentFileUrl);
+        }
+
+        currentFileUrl = URL.createObjectURL(file);
+        fileAudioEl = new Audio();
+        fileAudioEl.src = currentFileUrl;
+        fileAudioEl.crossOrigin = 'anonymous';
+        fileAudioEl.loop = true;
+        fileAudioEl.preload = 'auto';
+
+        audioSourceNode = audioContext.createMediaElementSource(fileAudioEl);
+        audioSourceNode.connect(analyser);
+        analyser.connect(audioContext.destination);
+
+        currentAudioMode = 'file';
+        audioStateEl.textContent = `Audio: file`;
+        setStatus(`Načten audio soubor: ${file.name}. Klikni Play file.`);
+      } catch (error) {
+        currentAudioMode = 'off';
+        audioStateEl.textContent = 'Audio: off';
+        setStatus(`Soubor se nepodařilo načíst: ${error.message}`);
+      }
+    }
+
+    async function playLoadedFile() {
+      if (!fileAudioEl) {
+        setStatus('Nejdřív nahraj .mp3 nebo .wav. Tlačítko Play bez souboru je jen placebo.');
+        return;
+      }
+      try {
+        if (audioContext) {
+          await audioContext.resume();
+        }
+        await fileAudioEl.play();
+        currentAudioMode = 'file';
+        audioStateEl.textContent = 'Audio: file';
+        setStatus('Přehrávání souboru běží. Audio teď moduluje pattern.');
+      } catch (error) {
+        setStatus(`Soubor se nepodařilo přehrát: ${error.message}`);
+      }
+    }
+
+    function getAudioFeatures() {
+      if (!analyser || !audioData || currentAudioMode === 'off') {
+        smoothedEnergy = lerp(smoothedEnergy, 0, 0.08);
+        smoothedCentroid = lerp(smoothedCentroid, 0, 0.08);
+        return { energy: smoothedEnergy, centroid: smoothedCentroid };
+      }
+
+      analyser.getByteFrequencyData(audioData);
+      let sum = 0;
+      let weighted = 0;
+      let total = 0;
+
+      for (let i = 0; i < audioData.length; i++) {
+        const v = audioData[i] / 255;
+        sum += v;
+        weighted += i * v;
+        total += v;
+      }
+
+      const energy = sum / audioData.length;
+      const centroid = total > 0 ? weighted / total / audioData.length : 0;
+
+      smoothedEnergy = lerp(smoothedEnergy, energy, 0.16);
+      smoothedCentroid = lerp(smoothedCentroid, centroid, 0.12);
+
+      return { energy: smoothedEnergy, centroid: smoothedCentroid };
+    }
+
+    function exportPNG() {
+      const link = document.createElement('a');
+      const ts = new Date().toISOString().replace(/[:.]/g, '-');
+      link.href = canvas.toDataURL('image/png');
+      link.download = `chladni-pattern-${ts}.png`;
+      link.click();
+      setStatus('PNG export hotový.');
+    }
+
+    function downloadWebGLHTML() {
+      const html = document.documentElement.outerHTML;
+      const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const ts = new Date().toISOString().replace(/[:.]/g, '-');
+      link.href = url;
+      link.download = `chladni-webgl-${ts}.html`;
+      link.click();
+      URL.revokeObjectURL(url);
+      setStatus('Stáhla se aktuální WebGL HTML verze toolu.');
+    }
+
+    function getSupportedRecordingMimeType() {
+      const candidates = [
+        'video/webm;codecs=vp9,opus',
+        'video/webm;codecs=vp8,opus',
+        'video/webm',
+        'video/mp4'
+      ];
+      for (const type of candidates) {
+        if (window.MediaRecorder && MediaRecorder.isTypeSupported(type)) {
+          return type;
+        }
+      }
+      return '';
+    }
+
+    function startRecording() {
+      if (!window.MediaRecorder) {
+        setStatus('MediaRecorder není v tomhle browseru dostupný. Bez něj video nenatočíš, a přání nestačí.');
+        return;
+      }
+      if (recorder && recorder.state === 'recording') {
+        recorder.stop();
+        return;
+      }
+
+      recordingMimeType = getSupportedRecordingMimeType();
+      if (!recordingMimeType) {
+        setStatus('Browser nepodporuje použitelný video export přes MediaRecorder.');
+        return;
+      }
+
+      const stream = canvas.captureStream(60);
+      recordChunks = [];
+
+      try {
+        recorder = new MediaRecorder(stream, recordingMimeType ? { mimeType: recordingMimeType } : undefined);
+      } catch (error) {
+        setStatus(`Recorder se nepodařilo spustit: ${error.message}`);
+        return;
+      }
+
+      recorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          recordChunks.push(event.data);
+        }
+      };
+
+      recorder.onstop = () => {
+        const extension = recordingMimeType.includes('mp4') ? 'mp4' : 'webm';
+        const blob = new Blob(recordChunks, { type: recordingMimeType || 'video/webm' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        const ts = new Date().toISOString().replace(/[:.]/g, '-');
+        link.href = url;
+        link.download = `chladni-recording-${ts}.${extension}`;
+        link.click();
+        URL.revokeObjectURL(url);
+        recordBtn.classList.remove('active-record');
+        recordBtn.textContent = 'Record';
+        recordStateEl.textContent = `Recorder: saved ${extension.toUpperCase()}`;
+        setStatus(`Nahrávání dokončeno. Soubor byl uložen jako ${extension.toUpperCase()}.`);
+      };
+
+      recorder.start(200);
+      recordBtn.classList.add('active-record');
+      recordBtn.textContent = 'Stop recording';
+      recordStateEl.textContent = 'Recorder: recording';
+      setStatus(`Nahrávání běží. Výstup bude uložen v podporovaném formátu: ${recordingMimeType}.`);
+    }
+
+    function renderFrame(now) {
+      if (!paused) {
+        renderStateEl.textContent = 'Render: live';
+      } else {
+        renderStateEl.textContent = 'Render: paused';
+      }
+
+      const time = paused ? (pauseStarted - baseTime) * 0.001 : (now - baseTime) * 0.001;
+      const { energy, centroid } = getAudioFeatures();
+      energyStateEl.textContent = `Energy: ${energy.toFixed(3)}`;
+
+      gl.useProgram(program);
+      gl.uniform2f(uniforms.resolution, width, height);
+      gl.uniform1f(uniforms.time, time);
+      gl.uniform1f(uniforms.energy, energy);
+      gl.uniform1f(uniforms.centroid, centroid);
+      gl.uniform1f(uniforms.complexity, parseFloat(complexityEl.value));
+      gl.uniform1f(uniforms.distortion, parseFloat(distortionEl.value));
+      gl.uniform1f(uniforms.threshold, parseFloat(thresholdEl.value));
+      gl.uniform4f(uniforms.textRect, textMetrics.x, textMetrics.y, textMetrics.w, textMetrics.h);
+      gl.uniform2f(uniforms.textAspect, textMetrics.aspectX, textMetrics.aspectY);
+      gl.uniform1f(uniforms.edgeSoftness, textMetrics.softness);
+      gl.uniform1f(uniforms.invert, 0.0);
+
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+      requestAnimationFrame(renderFrame);
+    }
+
+    audioBtn.addEventListener('click', enableMicrophone);
+    audioFile.addEventListener('change', (event) => loadAudioFile(event.target.files[0]));
+    playBtn.addEventListener('click', playLoadedFile);
+    exportPngBtn.addEventListener('click', exportPNG);
+    exportWebglBtn.addEventListener('click', downloadWebGLHTML);
+    recordBtn.addEventListener('click', startRecording);
+
+    pauseBtn.addEventListener('click', () => {
+      paused = !paused;
+      pauseBtn.textContent = paused ? 'Resume' : 'Pause';
+      if (paused) {
+        pauseStarted = performance.now();
+        setStatus('Animace pozastavena.');
+      } else {
+        baseTime += performance.now() - pauseStarted;
+        setStatus('Animace znovu spuštěna.');
+      }
+    });
+
+    [textInput, sizeEl, trackEl, leadEl, complexityEl, distortionEl, thresholdEl].forEach((control) => {
+      control.addEventListener('input', () => {
+        updateLabels();
+        rebuildTextMetrics();
+      });
+    });
+
+    window.addEventListener('resize', resize);
+
+    resize();
+    updateLabels();
+    rebuildTextMetrics();
+    requestAnimationFrame(renderFrame);
+  </script>
+</body>
+</html>
